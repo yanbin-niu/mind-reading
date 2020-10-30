@@ -10,15 +10,11 @@ Output format
 c = channels
 s = sample
 tm = trial segment
-0 = time 0
-h = header
-E = empty cell
-cl = channel label
+0 = time 0 marker
 
-h  |E|123456|.....|...|
-c  |cl|ssssss|sssss|...|
-tm |cl|t_____|t____|...|
-0  |cl|___m__|_m___|...|
+c  |ssssss|sssss|...|
+tm |t_____|t____|...|
+0  |___m__|_m___|...|
 """
 
 import os
