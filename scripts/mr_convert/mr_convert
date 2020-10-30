@@ -1,0 +1,176 @@
+#!/bin/env python
+
+"""mr_convert
+
+Usage:
+    mr_convert <file>...
+
+Output format
+
+c = channels
+s = sample
+tm = trial segment
+0 = time 0
+h = header
+E = empty cell
+cl = channel label
+
+h  |E|123456|.....|...|
+c  |cl|ssssss|sssss|...|
+tm |cl|t_____|t____|...|
+0  |cl|___m__|_m___|...|
+"""
+
+import os
+import sys
+import re
+import glob
+import scipy
+import numpy as np
+import pandas as pd
+from os import path as pt
+from docopt import docopt
+from scipy import io as sio
+from pprint import pprint
+
+
+def main(args):
+    # Iterate over all paths passed into program
+    for path in args["<file>"]:
+        basename = pt.splitext(pt.basename(path))[0]
+        # Usesful to know on which file it is one
+        print(basename)
+        # extract important information
+        labels, channels = process_mat_file(path)
+        # CARE must be taken changing the path, output_to_csv will overwrite data without checking
+        output_to_csv(f"output/{basename}.csv", channels, labels)
+
+
+# Simple save, no fancy path handling must be done by caller
+def output_to_csv(path, channels, labels):
+    # output to csv
+    arr = []
+    for label in labels:
+        arr.append(channels[label])
+
+    arr = np.array(arr)
+    np.savetxt(path, arr, delimiter=",", fmt="%f")
+
+
+# Uses the mat files we discussed
+# It extracts:
+#   Channel labels
+#   Channel data (mV)
+#   stim labels
+def process_mat_file(path):
+    mat = sio.loadmat(path)
+    segment_count = mat["SegmentCount"][0][0]
+    sample_rate = mat["SampleRate"][0][0]
+
+    # get a "nicer" list of the markers
+    markers = get_markers(mat["Markers"])
+    # get correct marker based on "Time 0" marker, returns [(pos, value),...]
+    stim_labels = get_stim_label(markers)
+    # generate marker position for csv
+    label_row = fill_with_pos(stim_labels, sample_rate, segment_count)
+
+    # Channel Labels "Fp1, ..., etc"
+    ch_labels = list(map(lambda e: e[3][0], mat["Channels"][0][..., ]))
+
+    # Channel mV
+    channels = {}
+    for label in ch_labels:
+        channels[label] = mat[label].flatten()
+
+    # Offset using sample_rate (1024)
+    # TODO: optimization, iterate over segment count vs samples
+    segment_offset = [0]*sample_rate*segment_count
+    for i, _e in enumerate(segment_offset):
+        if i % sample_rate == 0:
+            segment_offset[i] = 1
+
+    # Add segment marker and time 0 marker
+    channels["segment_marker"] = np.array(segment_offset, dtype=float)
+    channels["stim_label"] = np.array(label_row, dtype=float)
+
+    # Chan Labels
+    ch_labels.append("segment_marker")
+    ch_labels.append("stim_label")
+
+    return (ch_labels, channels)
+
+
+# Creates a zeroed array to act as a marker in the csv
+# segment = trial from mat file
+# sample_rate is the same as the mat file (prob 1024)
+# label = (trial, pos in trial, label value)
+def fill_with_pos(labels, sample_rate, segment_count):
+    # generate marker in data
+    row = ["0"]*sample_rate*segment_count
+    for label in labels:
+        segment = label[0]
+        sample_pos = label[1]
+        value = label[2]
+        index = (segment * sample_rate) + sample_pos - 1
+        row[index] = value
+
+    return row
+
+
+# Get Stimulus label
+# Uses regular expression to match against "Stimulus" and "S 11"
+#   For the label, it uses groups to extract the numerical value
+# Note: a marker element is flattened array of up to 3 cell arrays from matlab
+def get_stim_label(markers):
+    zero_pos = get_time_zero(markers)
+    labels = []
+
+    count = 0
+    for i, marker in enumerate(markers):
+        pos = zero_pos[i]
+        rv_marker = list(reversed(marker))
+        markers_at_zero = 0
+        for j, e in enumerate(rv_marker):
+            if j+1 < len(rv_marker) and re.match(r"Stimulus", str(e)) and rv_marker[j+1] == pos:
+                if match := re.match(r"[A-Z]\s+(\d+)", str(rv_marker[j+3])):
+                    markers_at_zero += 1
+                    st_type = int(match.group(1))
+                    labels.append((i, pos, st_type))
+
+        # Uncomment to check if Markers overlap, and grep output for ": [2-9]+"
+        # if markers_at_zero > 0:
+            # print(f"marker at zero count: {markers_at_zero}")
+
+    return labels
+
+
+# Not very straight forward due to how mat files are converted to numpy arrays
+def get_markers(markers):
+    marker_comp = []
+    for i, v in enumerate(markers):
+        # marker components (up to three parts) flattened into one list
+        marker_comp.append([])
+        # three comps
+        for e1 in v:
+            # four values
+            for e2 in e1:
+                tmp = e2.flatten()
+                if (len(tmp) > 0):
+                    marker_comp[i].append(tmp[0])
+    return marker_comp
+
+
+# Not used (but left as example for my self)
+def get_time_zero(markers):
+    # get Time 0 sample frame
+    pos = []
+    for i in markers:
+        if "Time 0" in i:
+            pos.append(i[i.index("Time 0") - 1])
+
+    return pos
+
+
+if __name__ == "__main__":
+    args = docopt(__doc__)
+    main(args)
