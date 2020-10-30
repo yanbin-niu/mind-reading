@@ -30,20 +30,35 @@ from pprint import pprint
 
 
 def main(args):
+    ch_info = {}
     # Iterate over all paths passed into program
     for path in args["<file>"]:
         basename = pt.splitext(pt.basename(path))[0]
+        # uses the first to parts of the mat file name,
+        # increase slice length to increase matching amount
+        common_name = "_".join(basename.split("_")[0:2])
+        # load mat file
+        mat = sio.loadmat(path)
+
         # Usesful to know on which file it is one
         print(basename)
         # extract important information
-        labels, channels = process_mat_file(path)
-        # CARE must be taken changing the path, output_to_csv will overwrite data without checking
+        labels, channels = process_mat_file(mat)
+        # CARE: does not check if overwriting files
         output_to_csv(f"output/{basename}.csv", channels, labels)
 
+        # Get common channel info
+        if common_name not in ch_info:
+            ch_info[common_name] = process_channel_info(mat)
 
-# Simple save, no fancy path handling must be done by caller
+    for cn in ch_info.keys():
+        # CARE: does not check if overwriting files
+        output_to_csv_ci(f"output/{cn}_chanInfo.csv", ch_info[cn])
+
+
+# Simple save, no overwrite check
 def output_to_csv(path, channels, labels):
-    # output to csv
+    # output sample data to csv
     arr = []
     for label in labels:
         arr.append(channels[label])
@@ -52,13 +67,34 @@ def output_to_csv(path, channels, labels):
     np.savetxt(path, arr, delimiter=",", fmt="%f")
 
 
+def output_to_csv_ci(path, ch_info):
+    # comments removes "#" from header, otherwise #Phi
+    # headr is for the first row
+    np.savetxt(path, ch_info, header="Phi,Theta,Radius,Name",
+               delimiter=",", fmt="%s", comments="")
+    # np.savetxt(path, ch_info, delimiter=",", fmt="%s")
+
+
+# get phi,theta,radius,name
+def process_channel_info(mat):
+    arr = []
+    for e in mat["Channels"][0]:
+        temp = []
+        for d in e:
+            # without this part only string is extracted
+            for c in d:
+                temp.append(c.flatten()[0])
+        arr.append(temp)
+
+    return np.array(arr)
+
+
 # Uses the mat files we discussed
 # It extracts:
 #   Channel labels
 #   Channel data (mV)
 #   stim labels
-def process_mat_file(path):
-    mat = sio.loadmat(path)
+def process_mat_file(mat):
     segment_count = mat["SegmentCount"][0][0]
     sample_rate = mat["SampleRate"][0][0]
 
