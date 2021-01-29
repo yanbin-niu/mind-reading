@@ -11,10 +11,6 @@ from sklearn.metrics import precision_score
 from keras import backend as K
 from keras import Sequential
 from keras.layers import Dense
-from keras.layers import Dropout
-from sklearn.preprocessing import LabelEncoder
-from keras.utils import np_utils
-from keras.callbacks import EarlyStopping
 
 
 def load_data(file):
@@ -43,11 +39,11 @@ def concatenate_data(df1, df2):
 
 def find_trials(data):
     """This function locates every index which indicates the start of a new trial
-     Args:
-          data (DataFrame): concatenated data
+        Args:
+            data (DataFrame): concatenated data
 
-     Returns:
-          List of all indices that indicate a new trial
+        Returns:
+            List of all indices that indicate a new trial
     """
     # find every beginning point of a trial
     trial_idx = data.loc[data[73] == 1.0]
@@ -58,11 +54,11 @@ def find_trials(data):
 
 def find_markers(data):
     """This function locates every index which indicates the markers needed to create labels
-       Args:
-           data (DataFrame): concatenated data
+        Args:
+            data (DataFrame): concatenated data
 
-       Returns:
-          DataFrame of all indices that indicate a marker
+        Returns:
+            DataFrame of all indices that indicate a marker
     """
     # find every marker (label)
     markers_idx = data.loc[data[74] != 0.0]
@@ -71,11 +67,11 @@ def find_markers(data):
 
 def create_binary_labels(data):
     """This function creates a binary label column to append to DataFrame for classification
-       (removing congruent/incongruent attribute only left/right)
-       Args:
-          data (DataFrame): concatenated data
+        (removing congruent/incongruent attribute only left/right)
+        Args:
+        data (DataFrame): concatenated data
 
-   Returns:
+    Returns:
         Pandas Series (column) of labels for supervised classification
     """
     markers_idx = data.loc[data[74] != 0.0]
@@ -89,33 +85,14 @@ def create_binary_labels(data):
     return labels
 
 
-def create_multi_labels(data):
-    """This function creates multiple label columns to append to DataFrame for
-        multiclass classification
-       Args:
-          data (DataFrame): concatenated data
-
-       Returns:
-        Pandas Series (column) of labels for supervised classification
-    """
-    markers_idx = data.loc[data[74] != 0.0]
-    labels = pd.Series(markers_idx[74], name='Labels').reset_index().drop(
-        'index', axis=1)
-    encoder = LabelEncoder()
-    labels = encoder.fit_transform(labels.values.ravel())
-    labels = pd.DataFrame(labels, columns=['Labels'])
-
-    return labels
-
-
 def separate_trials(data, trials_index):
     """This function separates the data into the different trials.
-     Args:
-          data (DataFrame): concatenated data
-          trials_index (List): list of all indices that indicate a new trial
+        Args:
+            data (DataFrame): concatenated data
+            trials_index (List): list of all indices that indicate a new trial
 
-     Returns:
-          List of each trial stored as DataFrames 
+        Returns:
+            List of each trial stored as DataFrames 
     """
     # trials list to store every trial
     trials = []
@@ -178,12 +155,11 @@ def average_trials(pro_trials):
 
     for split_trial in range(len(pro_trials)):
         avg_trial = pro_trials[split_trial].mean(axis=1)
-        #Scale every average trial
         avg_trials.append(avg_trial)
 
     return avg_trials
 
-# Concatenate the label column with the avg_trials_df
+
 def create_ml_df(avg_trials, labels):
     """This function concatenates the average trials dataframe with labels to structure
       dataframe in format to allow machine learning classification.
@@ -203,8 +179,6 @@ def create_ml_df(avg_trials, labels):
 
     return ml_df
 
-# Splits data into train and test, scales data depending on parameter
-
 
 def prepare_ml_df(ml_df, scale=True):
     """This function preprocesses the machine learning dataframe by giving 
@@ -216,8 +190,8 @@ def prepare_ml_df(ml_df, scale=True):
     Returns:
         DataFrame with machine learning structure 
     """
-    # Separating the independent variables from the label
 
+    # Separating the independent variables from the label
     if (scale == True):
         scaler = MinMaxScaler()
         X = ml_df.drop('Labels', axis=1)
@@ -236,18 +210,7 @@ def prepare_ml_df(ml_df, scale=True):
 
 
 def train_svc(X_train, X_test, y_train, y_test):
-    """This function trains an SVC classifier using grid search for hyperparameter tuning
-     in order to return the accuracy and precision.
-        
-    Args:
-        X_train : trained independent data
-        X_test :  test independent data
-        y_train : trained label/dependent data
-        y_test : test label/dependent data
 
-    Returns:
-        Accuracy and precision rates for the SVC
-    """
     # parameter grid
     param_grid = [{'C': [1, 10, 100, 1000], 'kernel': ['linear']}]
 
@@ -264,56 +227,12 @@ def train_svc(X_train, X_test, y_train, y_test):
     # return accuracy and precision
     accuracy = accuracy_score(y_pred, y_test)
     precision = precision_score(y_pred, y_test)
-
-    return accuracy, precision
-
-
-def train_svc_multi(X_train, X_test, y_train, y_test):
-    """This function trains an SVC classifier using grid search for hyperparameter tuning
-     in order to return the accuracy and precision.
-        
-    Args:
-        X_train : trained independent data
-        X_test :  test independent data
-        y_train : trained label/dependent data
-        y_test : test label/dependent data
-
-    Returns:
-        Accuracy and precision rates for the SVC
-    """
-    # parameter grid
-    param_grid = [{'C': [1, 10, 100, 1000], 'kernel': ['linear']}]
-
-    # Initializing the SVC Classifier
-    clf = SVC()
-
-    # Initialize grid search for hyperparameter tuning
-    gs_SVC = GridSearchCV(clf, param_grid, cv=5)
-    gs_SVC.fit(X_train, y_train)
-
-    # Predict using the fitted model
-    y_pred = gs_SVC.predict(X_test)
-
-    # return accuracy and precision
-    accuracy = accuracy_score(y_pred, y_test)
-    precision = precision_score(y_pred, y_test, average='weighted')
 
     return accuracy, precision
 
 
 def train_dtc(X_train, X_test, y_train, y_test):
-    """This function trains a Decision Tree classifier using grid search for hyperparameter tuning
-     in order to return the accuracy and precision.
-        
-    Args:
-        X_train : trained independent data
-        X_test :  test independent data
-        y_train : trained label/dependent data
-        y_test : test label/dependent data
 
-    Returns:
-        Accuracy and precision rates for the Decision Tree classifier
-    """
     # parameter grid
     params = {'max_leaf_nodes': list(
         range(2, 100)), 'min_samples_split': [2, 3, 4]}
@@ -331,56 +250,11 @@ def train_dtc(X_train, X_test, y_train, y_test):
     # return accuracy and precision
     accuracy = accuracy_score(y_pred, y_test)
     precision = precision_score(y_pred, y_test)
-
-    return accuracy, precision
-
-
-def train_dtc_multi(X_train, X_test, y_train, y_test):
-    """This function trains a Decision Tree classifier using grid search for hyperparameter tuning
-     in order to return the accuracy and precision.
-        
-    Args:
-        X_train : trained independent data
-        X_test :  test independent data
-        y_train : trained label/dependent data
-        y_test : test label/dependent data
-
-    Returns:
-        Accuracy and precision rates for the Decision Tree classifier
-    """
-    # parameter grid
-    params = {'max_leaf_nodes': list(
-        range(2, 100)), 'min_samples_split': [2, 3, 4]}
-
-    # Initializing classifier
-    dtc = DecisionTreeClassifier(random_state=42)
-
-    # Initialize grid search for hyperparameter tuning
-    gs_DTC = GridSearchCV(dtc, params, verbose=1, cv=5)
-    gs_DTC.fit(X_train, y_train)
-
-    # Predict using the fitted model
-    y_pred = gs_DTC.predict(X_test)
-
-    # return accuracy and precision
-    accuracy = accuracy_score(y_pred, y_test)
-    precision = precision_score(y_pred, y_test, average='weighted')
 
     return accuracy, precision
 
 
 def train_nb(X_train, X_test, y_train, y_test):
-   """This function trains a Naive Bayes classifier in order to return the accuracy and precision.
-        
-    Args:
-        X_train : trained independent data
-        X_test :  test independent data
-        y_train : trained label/dependent data
-        y_test : test label/dependent data
-
-    Returns:
-        Accuracy and precision rates for the Naive Bayes classifier
-    """
     # Initialize classifier
     nb = GaussianNB()
 
@@ -396,42 +270,7 @@ def train_nb(X_train, X_test, y_train, y_test):
     return accuracy, precision
 
 
-def train_nb_multi(X_train, X_test, y_train, y_test):
-    """This function trains a Naive Bayes classifier in order to return the accuracy and precision.
-        
-    Args:
-        X_train : trained independent data
-        X_test :  test independent data
-        y_train : trained label/dependent data
-        y_test : test label/dependent data
-
-    Returns:
-        Accuracy and precision rates for the Naive Bayes classifier
-    """
-    # Initialize classifier
-    nb = GaussianNB()
-
-    nb.fit(X_train, y_train)
-
-    # Predict using the fitted model
-    y_pred = nb.predict(X_test)
-
-    # return accuracy and precision
-    accuracy = accuracy_score(y_pred, y_test)
-    precision = precision_score(y_pred, y_test, average='weighted')
-
-    return accuracy, precision
-
-
 def precision_m(y_true, y_pred):
-    """This function finds the true precision of the keras classifier.
-    Args:
-        y_true : true numeric labels
-        y_pred : predicted numeric labels 
-
-    Returns:
-        True precision rate of the keras classifier
-    """
     true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
     predicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)))
     precision = true_positives / (predicted_positives + K.epsilon())
@@ -439,18 +278,7 @@ def precision_m(y_true, y_pred):
 
 
 def train_nn(n_inputs, X_train, X_test, y_train, y_test):
-    """This function uses a deep neural network for classification.
 
-    Args:
-        n_inputs : number of inputs
-        X_train : trained independent data
-        X_test :  test independent data
-        y_train : trained label/dependent data
-        y_test : test label/dependent data
-
-    Returns:
-        Accuracy and precision rates for the deep neural network classifier
-    """
     classifier = Sequential()
     # First Hidden Layer
     classifier.add(Dense(4, activation='relu',
@@ -467,48 +295,33 @@ def train_nn(n_inputs, X_train, X_test, y_train, y_test):
                        'acc', precision_m])
 
     # Fitting the data to the training dataset
-    classifier.fit(X_train, y_train, batch_size=2, epochs=700)
+    classifier.fit(X_train, y_train, batch_size=10, epochs=1000)
 
     _, accuracy, precision = classifier.evaluate(X_test, y_test, verbose=0)
 
     return accuracy, precision
 
 
-def train_nn_multi(n_inputs, X_train, X_test, y_train, y_test):
-    """This function uses a deep neural network for multiclass classification.
+def create_metric_df(acc_list, prec_list, model_list):
 
+    metrics = [acc_list, prec_list]
+    metric_df = pd.DataFrame(metrics).T
+    metric_df.index = model_list
+    metric_df.columns = ['acc', 'prec']
+
+    return metric_df
+
+def res_df(df, column, participant):
+    '''
+    Add precision/accuracy for every participant to the whole results
     Args:
-        n_inputs : number of inputs
-        X_train : trained independent data
-        X_test :  test independent data
-        y_train : trained label/dependent data
-        y_test : test label/dependent data
+        df: the dataframe of all results we have had
+        column: the dataframe of result we want to add
+        participant: participant number
+    returns:
+        all precision/accuracy results
+    '''
 
-    Returns:
-        Accuracy and precision rates for the deep neural network classifier
-    """
-    
-    model = Sequential()
-    # Rectified Linear Unit Activation Function
-    model.add(Dense(15, input_dim=n_inputs, activation='relu'))
-    model.add(Dropout(0.4))
-    model.add(Dense(15, activation='relu'))
-    model.add(Dropout(0.4))
-    # Softmax for multi-class classification
-    model.add(Dense(4, activation='softmax'))
-
-    # Changes to labels to categorical for multi
-    y_train = np_utils.to_categorical(y_train)
-    y_test = np_utils.to_categorical(y_test)
-
-    # Compile model here
-    model.compile(loss='categorical_crossentropy',
-                  optimizer='adam', metrics=['acc', precision_m])
-
-    callback = EarlyStopping(monitor='val_loss', patience=50)
-    model.fit(X_train, y_train, validation_data=(X_test, y_test),
-              batch_size=2, epochs=500, callbacks=[callback])
-
-    _, accuracy, precision = model.evaluate(X_test, y_test, verbose=0)
-
-    return accuracy, precision
+    data = pd.DataFrame({f"Participant {participant}": column})
+    df[f"Participant {participant}"] = data[f"Participant {participant}"].values
+    return df
