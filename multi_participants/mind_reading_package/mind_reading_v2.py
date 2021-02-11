@@ -69,6 +69,31 @@ def find_markers(data):
     return markers_idx
 
 
+def create_ic_labels(data):
+    """This function creates a binary label column to append to DataFrame for classification
+       (removing left/right attribute only congruent vs incongruent)
+       Args:
+          data (DataFrame): concatenated data
+
+   Returns:
+        Pandas Series (column) of labels for supervised classification
+    """
+    markers_idx = data.loc[data[74] != 0.0]
+    labels = pd.Series(markers_idx[74], name='Labels').reset_index().drop(
+        'index', axis=1)
+    for i in labels.index:
+        # if congruent label, assign 0
+        if int(labels.iloc[i]) == 11 or int(labels.iloc[i]) == 22:
+            labels.iloc[i] = 0
+        else:
+            labels.iloc[i] = 1
+    return labels
+# 11 = left congruent
+# 22 = right congruent
+# 31 = left incongruent (left denotes direction of center arrow)
+# 42 = right incongruent
+
+
 def create_binary_labels(data):
     """This function creates a binary label column to append to DataFrame for classification
        (removing congruent/incongruent attribute only left/right)
@@ -135,17 +160,20 @@ def separate_trials(data, trials_index):
     return trials
 
 
-def process_trials(trials):
+def process_trials(trials, window_1, window_2):
     """This function goes through each trial, resets the columns to show sample rate,
-        gets data in the time window between 308th - 513th sample, and removes all channels from 64 on.
+        gets data in the time window between (window_1 bound) - (window_2 bound)sample, and removes all channels from 64 on then scales 
+        data per channel for each trial.
     Args:
         trials (List): list of all trials separated previously
+        window_1 (Integer): first bound of window
+        window_2 (Integer): second bound of window
 
     Returns:
         List of each processed trial stored as DataFrames 
     """
     # Go through each trial, reset the columns, we split from 100-300ms ((308th sample to 513th sample))
-
+    scaler = MinMaxScaler()
     # Processed trials: trials which have been processed to split between 100-300ms
     pro_trials = []
 
@@ -155,9 +183,16 @@ def process_trials(trials):
         # Resets the column numbers to allow easier slicing of samples
         tr_df.columns = range(tr_df.shape[1])
         # Slice each trial
-        tr_df = tr_df.loc[:, 308:513]
+        tr_df = tr_df.loc[:, window_1: window_2]
         # Remove all channels(rows) from 64 and up
         tr_df = tr_df.drop(tr_df.index[64:])
+        # Turn trial frame around to scale across columns
+        tr_df = tr_df.T
+        # Scale per column/channel
+        for column in list(tr_df.columns):
+            tr_df[column] = scaler.fit_transform(pd.DataFrame(tr_df[column]))
+        # Flip trial frame back to output with channels on axis=0
+        tr_df = tr_df.T
         # Append new/processed trials in list
         pro_trials.append(tr_df)
 
@@ -178,12 +213,14 @@ def average_trials(pro_trials):
 
     for split_trial in range(len(pro_trials)):
         avg_trial = pro_trials[split_trial].mean(axis=1)
-        #Scale every average trial
+        # Scale every average trial
         avg_trials.append(avg_trial)
 
     return avg_trials
 
 # Concatenate the label column with the avg_trials_df
+
+
 def create_ml_df(avg_trials, labels):
     """This function concatenates the average trials dataframe with labels to structure
       dataframe in format to allow machine learning classification.
@@ -238,7 +275,7 @@ def prepare_ml_df(ml_df, scale=True):
 def train_svc(X_train, X_test, y_train, y_test):
     """This function trains an SVC classifier using grid search for hyperparameter tuning
      in order to return the accuracy and precision.
-        
+
     Args:
         X_train : trained independent data
         X_test :  test independent data
@@ -271,7 +308,7 @@ def train_svc(X_train, X_test, y_train, y_test):
 def train_svc_multi(X_train, X_test, y_train, y_test):
     """This function trains an SVC classifier using grid search for hyperparameter tuning
      in order to return the accuracy and precision.
-        
+
     Args:
         X_train : trained independent data
         X_test :  test independent data
@@ -304,7 +341,7 @@ def train_svc_multi(X_train, X_test, y_train, y_test):
 def train_dtc(X_train, X_test, y_train, y_test):
     """This function trains a Decision Tree classifier using grid search for hyperparameter tuning
      in order to return the accuracy and precision.
-        
+
     Args:
         X_train : trained independent data
         X_test :  test independent data
@@ -338,7 +375,7 @@ def train_dtc(X_train, X_test, y_train, y_test):
 def train_dtc_multi(X_train, X_test, y_train, y_test):
     """This function trains a Decision Tree classifier using grid search for hyperparameter tuning
      in order to return the accuracy and precision.
-        
+
     Args:
         X_train : trained independent data
         X_test :  test independent data
@@ -370,17 +407,17 @@ def train_dtc_multi(X_train, X_test, y_train, y_test):
 
 
 def train_nb(X_train, X_test, y_train, y_test):
-   """This function trains a Naive Bayes classifier in order to return the accuracy and precision.
-        
-    Args:
-        X_train : trained independent data
-        X_test :  test independent data
-        y_train : trained label/dependent data
-        y_test : test label/dependent data
+    """This function trains a Naive Bayes classifier in order to return the accuracy and precision.
 
-    Returns:
-        Accuracy and precision rates for the Naive Bayes classifier
-    """
+     Args:
+         X_train : trained independent data
+         X_test :  test independent data
+         y_train : trained label/dependent data
+         y_test : test label/dependent data
+
+     Returns:
+         Accuracy and precision rates for the Naive Bayes classifier
+     """
     # Initialize classifier
     nb = GaussianNB()
 
@@ -398,7 +435,7 @@ def train_nb(X_train, X_test, y_train, y_test):
 
 def train_nb_multi(X_train, X_test, y_train, y_test):
     """This function trains a Naive Bayes classifier in order to return the accuracy and precision.
-        
+
     Args:
         X_train : trained independent data
         X_test :  test independent data
@@ -487,7 +524,7 @@ def train_nn_multi(n_inputs, X_train, X_test, y_train, y_test):
     Returns:
         Accuracy and precision rates for the deep neural network classifier
     """
-    
+
     model = Sequential()
     # Rectified Linear Unit Activation Function
     model.add(Dense(15, input_dim=n_inputs, activation='relu'))
@@ -512,6 +549,7 @@ def train_nn_multi(n_inputs, X_train, X_test, y_train, y_test):
     _, accuracy, precision = model.evaluate(X_test, y_test, verbose=0)
 
     return accuracy, precision
+
 
 def res_df(df, column, participant):
     '''
