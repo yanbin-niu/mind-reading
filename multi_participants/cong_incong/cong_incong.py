@@ -49,7 +49,7 @@ for participant in participants:
     ml_df = mr.create_ml_df(avg_trials, labels)
 
     # train models
-    X_train, X_test, y_train, y_test = mr.prepare_ml_df(ml_df)
+    X_train, X_test, y_train, y_test = mr.prepare_ml_df(ml_df, scale=False)
 
     acc_svc, precision_svc = mr.train_svc(X_train, X_test, y_train, y_test)
 
