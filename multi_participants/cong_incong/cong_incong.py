@@ -6,7 +6,7 @@ import pandas as pd
 participants = os.listdir('path')
 
 # remove the 'cha' folder we don't need
-participants = participants.remove('cha')
+# participants = participants.remove('cha')
 
 # create the initial dataframe
 df = pd.DataFrame(index=['SVC', 'DTC', 'NB', 'NN'])
@@ -39,6 +39,7 @@ for participant in participants:
     labels = mr.create_ic_labels(data)
 
     # Go through each trial, reset the columns, we split from 100-300ms ((308th sample to 513th sample))
+    # Increase window by 50ms each try
     pro_trials = mr.process_trials(trials, 250, 550)
 
     # Find the mean across channels
