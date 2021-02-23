@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from matplotlib import pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
@@ -565,3 +566,14 @@ def res_df(df, column, participant):
     data = pd.DataFrame({f"Participant {participant}": column})
     df[f"Participant {participant}"] = data[f"Participant {participant}"].values
     return df
+
+
+def graph_data(data):
+    data = pd.read_csv(data)
+    standErr = np.std(data, ddof=1, axis=1) / np.sqrt(np.size(data, axis=1))
+    data['mean'] = data.mean(axis=1)
+    plt.figure(figsize=(7, 8))
+    plt.errorbar(data['Unnamed: 0'], data['mean'], yerr=standErr, fmt='o',
+                 color='Black', elinewidth=2, capthick=2, errorevery=1, alpha=1, ms=2, capsize=3)
+    # Bar plot
+    return plt.bar(data['Unnamed: 0'], data['mean'], tick_label=data['Unnamed: 0'], color='mediumslateblue')
