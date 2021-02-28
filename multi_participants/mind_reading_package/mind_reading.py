@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-from matplotlib import pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
@@ -16,6 +15,7 @@ from keras.layers import Dropout
 from sklearn.preprocessing import LabelEncoder
 from keras.utils import np_utils
 from keras.callbacks import EarlyStopping
+from sklearn.model_selection import cross_val_score
 
 
 def load_data(file):
@@ -188,12 +188,12 @@ def process_trials(trials, window_1, window_2):
         # Remove all channels(rows) from 64 and up
         tr_df = tr_df.drop(tr_df.index[64:])
         # Turn trial frame around to scale across columns
-        tr_df = tr_df.T
+        #tr_df = tr_df.T
         # Scale per column/channel
         for column in list(tr_df.columns):
             tr_df[column] = scaler.fit_transform(pd.DataFrame(tr_df[column]))
         # Flip trial frame back to output with channels on axis=0
-        tr_df = tr_df.T
+        #tr_df = tr_df.T
         # Append new/processed trials in list
         pro_trials.append(tr_df)
 
@@ -244,7 +244,7 @@ def create_ml_df(avg_trials, labels):
 # Splits data into train and test, scales data depending on parameter
 
 
-def prepare_ml_df(ml_df, scale=True):
+def prepare_ml_df(ml_df, scale=False):
     """This function preprocesses the machine learning dataframe by giving 
       an option of scaling the data before splitting into training and testing sets.
     Args:
@@ -287,7 +287,7 @@ def train_svc(X_train, X_test, y_train, y_test):
         Accuracy and precision rates for the SVC
     """
     # parameter grid
-    param_grid = [{'C': [1, 10, 100, 1000], 'kernel': ['linear']}]
+    param_grid = [{'C': [1, 10, 100, 1000], 'kernel': ['linear', 'rbf']}]
 
     # Initializing the SVC Classifier
     clf = SVC()
@@ -299,11 +299,16 @@ def train_svc(X_train, X_test, y_train, y_test):
     # Predict using the fitted model
     y_pred = gs_SVC.predict(X_test)
 
+    # Include cross-validation
+    scores = cross_val_score(gs_SVC, X_train, y_train,
+                             cv=5, scoring='accuracy')
+    cv_acc = scores.mean()
+
     # return accuracy and precision
     accuracy = accuracy_score(y_pred, y_test)
     precision = precision_score(y_pred, y_test)
 
-    return accuracy, precision
+    return accuracy, precision, cv_acc
 
 
 def train_svc_multi(X_train, X_test, y_train, y_test):
@@ -320,7 +325,7 @@ def train_svc_multi(X_train, X_test, y_train, y_test):
         Accuracy and precision rates for the SVC
     """
     # parameter grid
-    param_grid = [{'C': [1, 10, 100, 1000], 'kernel': ['linear']}]
+    param_grid = [{'C': [1, 10, 100, 1000], 'kernel': ['linear', 'rbf']}]
 
     # Initializing the SVC Classifier
     clf = SVC()
@@ -332,11 +337,16 @@ def train_svc_multi(X_train, X_test, y_train, y_test):
     # Predict using the fitted model
     y_pred = gs_SVC.predict(X_test)
 
+    # Include cross-validation
+    scores = cross_val_score(gs_SVC, X_train, y_train,
+                             cv=5, scoring='accuracy')
+    cv_acc = scores.mean()
+
     # return accuracy and precision
     accuracy = accuracy_score(y_pred, y_test)
     precision = precision_score(y_pred, y_test, average='weighted')
 
-    return accuracy, precision
+    return accuracy, precision, cv_acc
 
 
 def train_dtc(X_train, X_test, y_train, y_test):
@@ -366,11 +376,16 @@ def train_dtc(X_train, X_test, y_train, y_test):
     # Predict using the fitted model
     y_pred = gs_DTC.predict(X_test)
 
+    # Include cross-validation
+    scores = cross_val_score(gs_DTC, X_train, y_train,
+                             cv=5, scoring='accuracy')
+    cv_acc = scores.mean()
+
     # return accuracy and precision
     accuracy = accuracy_score(y_pred, y_test)
     precision = precision_score(y_pred, y_test)
 
-    return accuracy, precision
+    return accuracy, precision, cv_acc
 
 
 def train_dtc_multi(X_train, X_test, y_train, y_test):
@@ -400,11 +415,16 @@ def train_dtc_multi(X_train, X_test, y_train, y_test):
     # Predict using the fitted model
     y_pred = gs_DTC.predict(X_test)
 
+    # Include cross-validation
+    scores = cross_val_score(gs_DTC, X_train, y_train,
+                             cv=5, scoring='accuracy')
+    cv_acc = scores.mean()
+
     # return accuracy and precision
     accuracy = accuracy_score(y_pred, y_test)
     precision = precision_score(y_pred, y_test, average='weighted')
 
-    return accuracy, precision
+    return accuracy, precision, cv_acc
 
 
 def train_nb(X_train, X_test, y_train, y_test):
@@ -431,7 +451,11 @@ def train_nb(X_train, X_test, y_train, y_test):
     accuracy = accuracy_score(y_pred, y_test)
     precision = precision_score(y_pred, y_test)
 
-    return accuracy, precision
+    # Include cross-validation
+    scores = cross_val_score(nb, X_train, y_train, cv=5, scoring='accuracy')
+    cv_acc = scores.mean()
+
+    return accuracy, precision, cv_acc
 
 
 def train_nb_multi(X_train, X_test, y_train, y_test):
@@ -458,7 +482,10 @@ def train_nb_multi(X_train, X_test, y_train, y_test):
     accuracy = accuracy_score(y_pred, y_test)
     precision = precision_score(y_pred, y_test, average='weighted')
 
-    return accuracy, precision
+    scores = cross_val_score(nb, X_train, y_train, cv=5, scoring='accuracy')
+    cv_acc = scores.mean()
+
+    return accuracy, precision, cv_acc
 
 
 def precision_m(y_true, y_pred):
@@ -566,14 +593,3 @@ def res_df(df, column, participant):
     data = pd.DataFrame({f"Participant {participant}": column})
     df[f"Participant {participant}"] = data[f"Participant {participant}"].values
     return df
-
-
-def graph_data(data):
-    data = pd.read_csv(data)
-    standErr = np.std(data, ddof=1, axis=1) / np.sqrt(np.size(data, axis=1))
-    data['mean'] = data.mean(axis=1)
-    plt.figure(figsize=(7, 8))
-    plt.errorbar(data['Unnamed: 0'], data['mean'], yerr=standErr, fmt='o',
-                 color='Black', elinewidth=2, capthick=2, errorevery=1, alpha=1, ms=2, capsize=3)
-    # Bar plot
-    return plt.bar(data['Unnamed: 0'], data['mean'], tick_label=data['Unnamed: 0'], color='mediumslateblue')
